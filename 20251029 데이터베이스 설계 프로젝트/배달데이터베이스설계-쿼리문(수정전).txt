@@ -1,0 +1,155 @@
+-- [1] 사용자 테이블
+CREATE TABLE User (
+  user_id INT AUTO_INCREMENT PRIMARY KEY,
+  user_name VARCHAR(50) NOT NULL,
+  nickname VARCHAR(30),
+  phone VARCHAR(15) UNIQUE NOT NULL,
+  birth_date DATE,
+  role ENUM('부모', '사장', '관리자') DEFAULT '부모',
+  email VARCHAR(100) UNIQUE NOT NULL
+);
+
+-- [2] 자녀 테이블
+CREATE TABLE Child (
+  child_id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  nickname VARCHAR(30),
+  child_name VARCHAR(50) NOT NULL,
+  birth_date DATE,
+  gender ENUM('남아', '여아'),
+  FOREIGN KEY (user_id) REFERENCES User(user_id) ON DELETE CASCADE
+);
+
+-- [3] 알러지 유발 물질
+CREATE TABLE Allergen (
+  allergen_id INT AUTO_INCREMENT PRIMARY KEY,
+  ingredient_name VARCHAR(50) NOT NULL
+);
+
+-- [4] 자녀 알러지 매핑
+CREATE TABLE ChildAllergy (
+  allergy_id INT AUTO_INCREMENT PRIMARY KEY,
+  child_id INT NOT NULL,
+  allergen_id INT NOT NULL,
+  FOREIGN KEY (child_id) REFERENCES Child(child_id) ON DELETE CASCADE,
+  FOREIGN KEY (allergen_id) REFERENCES Allergen(allergen_id) ON DELETE CASCADE,
+	CONSTRAINT uniq_child_allergen UNIQUE (child_id, allergen_id)
+);
+
+-- [5] 가게
+CREATE TABLE Store (
+  store_id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  address VARCHAR(200),
+  phone VARCHAR(15),
+  description TEXT,
+  photo_url VARCHAR(255),
+  likes INT DEFAULT 0,
+  FOREIGN KEY (user_id) REFERENCES User(user_id) ON DELETE CASCADE
+);
+
+-- [6] 가게 찜
+CREATE TABLE StoreLike (
+  like_id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  store_id INT NOT NULL,
+  UNIQUE (user_id, store_id),
+  FOREIGN KEY (user_id) REFERENCES User(user_id) ON DELETE CASCADE,
+  FOREIGN KEY (store_id) REFERENCES Store(store_id) ON DELETE CASCADE
+);
+
+-- [7] 가게 리뷰
+CREATE TABLE StoreReview (
+  review_id INT AUTO_INCREMENT PRIMARY KEY,
+  store_id INT NOT NULL,
+  user_id INT NOT NULL,
+  order_id INT NOT NULL,
+  author_name VARCHAR(50),
+  content TEXT,
+  photo_url VARCHAR(255),
+  rating DECIMAL(2,1) CHECK (rating >= 0 AND rating <= 5),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (order_id), 
+  FOREIGN KEY (store_id) REFERENCES Store(store_id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES User(user_id) ON DELETE CASCADE,
+  FOREIGN KEY (order_id) REFERENCES OrderInfo(order_id) ON DELETE CASCADE 
+);
+-- [8] 음식
+CREATE TABLE Food (
+  food_id INT AUTO_INCREMENT PRIMARY KEY,
+  store_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  price DECIMAL(10,2) NOT NULL,
+  photo_url VARCHAR(255),
+  calories INT,
+  protein DECIMAL(5,2),
+  vitamin DECIMAL(5,2),
+  calcium DECIMAL(5,2),
+  is_deleted BOOLEAN DEFAULT FALSE,
+  deleted_at DATETIME NULL,
+  FOREIGN KEY (store_id) REFERENCES Store(store_id) ON DELETE CASCADE
+);
+
+-- [9] 실제 음식 재료
+CREATE TABLE FoodIngredient (
+  ingredient_id INT AUTO_INCREMENT PRIMARY KEY,
+  food_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  origin VARCHAR(100),
+  organic BOOLEAN DEFAULT FALSE,
+  FOREIGN KEY (food_id) REFERENCES Food(food_id) ON DELETE CASCADE
+);
+
+-- [10] 음식 - 알러지 관계
+CREATE TABLE IngredientAllergen (
+  ingredient_id INT NOT NULL,
+  allergen_id INT NOT NULL,
+  PRIMARY KEY (ingredient_id, allergen_id),
+  FOREIGN KEY (ingredient_id) REFERENCES FoodIngredient(ingredient_id) ON DELETE CASCADE,
+  FOREIGN KEY (allergen_id) REFERENCES Allergen(allergen_id) ON DELETE CASCADE
+);
+
+-- [11] 주문정보
+CREATE TABLE OrderInfo (
+  order_id INT AUTO_INCREMENT PRIMARY KEY,
+  store_id INT NOT NULL,
+  user_id INT NOT NULL,
+  child_id INT, --추가
+  status ENUM('주문대기', '조리중', '배달중', '완료', '취소') DEFAULT '주문대기',
+  request_note TEXT,
+  reservation_time DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  started_at DATETIME,
+  delivered_at DATETIME, 
+  FOREIGN KEY (store_id) REFERENCES Store(store_id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES User(user_id) ON DELETE CASCADE,
+  FOREIGN KEY (child_id) REFERENCES Child(child_id) ON DELETE CASCADE --추가
+);
+
+-- [12] 주문 음식
+CREATE TABLE OrderItem (
+  order_item_id INT AUTO_INCREMENT PRIMARY KEY,
+  order_id INT NOT NULL,
+  food_id INT NOT NULL,
+  spicy_level TINYINT CHECK (spicy_level BETWEEN 0 AND 5),
+  salty_level TINYINT CHECK (salty_level BETWEEN 0 AND 5),
+  sweet_level TINYINT CHECK (sweet_level BETWEEN 0 AND 5),
+  final_price DECIMAL(10,2) NOT NULL,
+  FOREIGN KEY (order_id) REFERENCES OrderInfo(order_id) ON DELETE CASCADE,
+  FOREIGN KEY (food_id) REFERENCES Food(food_id)
+);
+
+-- [13] 결제
+CREATE TABLE Payment (
+  payment_id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  order_id INT UNIQUE,
+  method ENUM('카드', '현금', '포인트', '간편결제'),
+  payment_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  status ENUM('성공', '실패', '취소') DEFAULT '성공',
+  amount DECIMAL(10,2) NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES User(user_id),
+  FOREIGN KEY (order_id) REFERENCES OrderInfo(order_id) ON DELETE CASCADE
+);
